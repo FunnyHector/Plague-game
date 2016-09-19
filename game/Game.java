@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -16,68 +17,87 @@ import game.items.Key;
 import game.items.Torch;
 import game.player.Direction;
 import game.player.Player;
+import game.player.Position;
 import game.world.Area;
 import game.world.Chest;
-import game.world.GroundSquare;
-import game.world.Position;
+import game.world.Container;
+import game.world.Lockable;
+import game.world.MapElement;
+import game.world.Obstacle;
 import game.world.Room;
-import game.world.RoomEntrance;
-import game.world.RoomExit;
-import game.world.World;
+import game.world.TransitionSpace;
 
 /**
  * This class represents the game.
  * 
+ * FOR TEAM
+ *
+ * Ideally, other packages who want to visit game states should only interact with this
+ * class. This class wraps all game-world-related and logic-related classes inside, and
+ * provides getters, setters and reasonable functions for external packages to interact
+ * with game. If you guys need any access point for some stuff, like player, item, map, or
+ * time, and it is not provided within this class yet, let me know.
+ *
  * @author Hector (Fang Zhao 300364061)
  *
  */
 public class Game {
+    /**
+     * The visibility in daytime. This number indicates that everything within this
+     * distance on world grid is visible.
+     */
+    public static final int DAY_VISIBLIITY = 8;
+    /**
+     * The visibility in night time. This number indicates that everything within this
+     * distance on world grid is visible.
+     */
+    public static final int NIGHT_VISIBILITY = 2;
+    /**
+     * The visibility if the player is holding a torch in night time. This number
+     * indicates that everything within this distance on world grid is visible.
+     */
+    public static final int TORCH_VISIBILITY = 5;
 
     /**
      * A new player has this chance of spawning in world map. If not spawned in world, the
      * player will be spawned in a random room.
      */
-    private static final float SPAWN_IN_WORLD_CHANCE = 0.6f;
-
-    private World world;
+    // private static final float SPAWN_IN_WORLD_CHANCE = 0.6f;
 
     /**
-     * keep track on each room with its entrance position
+     * World map
      */
-    private Map<Room, RoomEntrance> entrances;
-
+    private Area world;
+    /**
+     * Each area has its unique area id number. All areas and their corresponding id
+     * number is recorded in this map.
+     */
+    private Map<Integer, Area> areas;
     /**
      * players and their id. Server can find player easily by looking by id.
      */
     private Map<Integer, Player> players;
     /**
-     * All torches in this world. used to track their burning status.
+     * For testing. Will be removed.
+     */
+    private Player player;
+    /**
+     * All torches in this world. It is used to track torch burning status in timer.
      */
     private List<Torch> torches;
-
     /**
      * A timer for world clock. It starts when the Game object is constructed.
      */
     private Timer timer;
-
-    // the world clock starts from 00:00
-    private LocalTime clock = LocalTime.of(0, 0, 0);
-
-    /*
-     * FOR TEAM
-     * 
-     * Ideally, other packages who want to visit game states should only interact with
-     * this class. This class wraps all game-world-related and logic-related classes
-     * inside, and provides getters, setters and reasonable functions for external
-     * packages to interact with game. If you guys need any access point for some stuff,
-     * like player, item, map, or time, and it is not provided within this class yet, let
-     * me know.
+    /**
+     * The world clock. It starts from a random time from 00:00:00 to 23:59:59
      */
+    private LocalTime clock;
 
     /**
      * Constructor, take in an XML file that describes the game world, and construct it
      * with details in the file.
-     * 
+     *
      * @param file
      */
     public Game(File file) {
@@ -87,53 +107,78 @@ public class Game {
 
         // TODO parse the file and construct world
 
+        // TODO scan the world, so some initialisation job:
+        // 1. remember all containers (for key re-distribution)
+        // 2.
+
         // start the world clock
         startTiming();
     }
 
     /**
-     * Constructor for testing
+     * Constructor for text-based UI. Will not exist in final version.
      * 
-     * @param file
+     * @param world
+     * @param entrances
      */
-    public Game(World world, Map<Room, RoomEntrance> entrances) {
+    public Game(Area world, Map<Integer, Area> areas) {
 
         players = new HashMap<>();
         torches = new ArrayList<>();
 
         this.world = world;
-        this.entrances = entrances;
+        this.areas = areas;
 
         // start the world clock
         startTiming();
     }
 
+    /**
+     * Constructor used for data storage test. Will not exist in final version.
+     * 
+     * @param world
+     * @param entrances
+     * @param player
+     */
+    public Game(Area world, Map<Integer, Area> areas, Player player) {
+
+        this.world = world;
+        this.areas = areas;
+        this.player = player;
+        this.players = new HashMap<>();
+        this.torches = new ArrayList<>();
+        joinPlayer(this.player);
+
+        // start the world clock
+        startTiming();
+    }
+
+    /**
+     * Start the world time. The world time is constantly advancing. As long as the server
+     * is running, no other events will stop it.
+     */
     private void startTiming() {
+        // the world clock starts from a random time from 00:00:00 to 23:59:59
+        Random ran = new Random();
+        int hour = ran.nextInt(24);
+        int minute = ran.nextInt(60);
+        int second = ran.nextInt(60);
+        clock = LocalTime.of(hour, minute, second);
+
+        // start ticking
         timer = new Timer();
-        // this timer will constantly decrease every player's life by 1 minute.
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-
-                // only for testing time lapse in text-client
-                System.out.println("Current time:" + clock.getHour() + ":"
-                        + clock.getMinute() + ":" + clock.getSecond());
-
                 // decrease every player's life
                 for (Player p : players.values()) {
                     p.increaseHealth(-1);
-
-                    // only for testing time lapse in text-client
-                    System.out.println("Your life: " + p.getHealthLeft());
                 }
 
                 // decrease every torch's time left
                 for (Torch t : torches) {
                     if (t.isFlaming()) {
                         t.Burn();
-
-                        // only for testing time lapse in text-client
-                        System.out.println("The torch's time: " + t.getTimeLeft());
                     }
                 }
 
@@ -144,16 +189,11 @@ public class Game {
     }
 
     /**
-     * This method returns the clock of the world. The world time is constantly advancing.
+     * Joins a player in game.
      * 
-     * @return
+     * @param player
      */
-    public LocalTime getClock() {
-        return clock;
-    }
-
     public void joinPlayer(Player player) {
-        GroundSquare gs;
 
         // =======================================
         /*
@@ -179,179 +219,210 @@ public class Game {
 
         // ================================================================
 
-        gs = world.getPlayerSpawnPos(this);
+        players.put(player.getId(), player);
 
-        if (gs == null) {
-            /*
-             * This should never happen. In theory, if the whole world doesn't have even
-             * one empty position left, this could happen. But that is almost impossible.
-             */
+        /*
+         * If player has a position, then it has been loaded from a previous game, and
+         * does not need a new position.
+         */
+        if (player.getPosition() != null) {
+            return;
+        }
+
+        // Let's spawn the player in a random location.
+        Position pos = world.getPlayerSpawnPos(this);
+
+        /*
+         * This should never happen. In theory, if the whole world doesn't have even one
+         * empty position left, this could happen. But that is almost impossible.
+         */
+        if (pos == null) {
             throw new GameError("In theory: World full. More likely, there is a bug.");
         }
 
-        player.setPosition(gs);
-        player.setDirection(Direction.randomDirection());
-
-        players.put(player.getId(), player);
-
+        player.setPosition(pos);
     }
 
+    /**
+     * Disconnect the player, and re-distribute all his keys to locked containers.
+     * 
+     * @param player
+     */
     public void disconnectPlayer(Player player) {
-        // TODO
-        /*
-         * 1. delete player from player list. 2. delete his torch from torch list. 3. put
-         * the key(s) in his inventory on ground
-         */
-    }
+        // delete player from player list.
+        players.remove(player);
 
-    public Player getPlayerById(int id) {
-        Player player = players.get(id);
-        if (player == null) {
-            throw new GameError("Unknown player Id.");
-        }
+        // delete his torch from torch list.
+        List<Torch> hisTorches = player.getAllTorches();
+        torches.removeAll(hisTorches);
 
-        return player;
+        // TODO need to deal with keys in his inventory. Probably re-distribute them
+        List<Key> hisKeys = player.getAllKeys();
+
     }
 
     /**
      * This method check if the given position is occupied by other player.
-     * 
+     *
      * @param position
-     * @return
+     * @return --- true if there is another player in that position; or false if not.
      */
-    public boolean isEmptyPosition(GroundSquare position) {
-        for (Player p : players.values()) {
-            if (p.getPosition().equals(position)) {
-                return false;
-            }
+    public boolean isOccupiedByOtherPlayer(Position position) {
+        if (position == null) {
+            return true;
         }
 
-        return true;
+        for (Player p : players.values()) {
+            if (p.getPosition() != null && p.getPosition().equals(position)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
      * This method tries to move the given player one step forward.
-     * 
+     *
      * @param player
      * @return --- true if successful, or false if the player cannot move forward for some
      *         reason, e.g. blocked by obstacle.
      */
     public boolean playerMoveForward(Player player) {
-        Area currentArea = player.getPosition().getArea();
-        Position forwardPos = currentArea.getFrontPos(player);
+        Position currentPosition = player.getPosition();
+        Direction currentDirection = player.getDirection();
+        Area currentArea = areas.get(currentPosition.areaId);
+        MapElement frontMapElement = currentArea.getFrontMapElement(player);
 
-        // check if the forward position is a valid one to move to
-        if (!canMoveTo(player, forwardPos)) {
+        // check if there is obstacles in front
+        if (frontMapElement == null || frontMapElement instanceof Obstacle) {
             return false;
         }
 
-        // After canMove() check, it's safe to cast
-        GroundSquare gs = (GroundSquare) forwardPos;
+        Position forwardPosition = currentPosition.frontPosition(currentDirection);
+
+        // check if it's out of board
+        if (!currentArea.isInBoard(forwardPosition)) {
+            return false;
+        }
+
+        // check if there are other players in front
+        if (isOccupiedByOtherPlayer(forwardPosition)) {
+            return false;
+        }
 
         // OK we can move him forward
-        player.setPosition(gs);
+        player.setPosition(forwardPosition);
         return true;
     }
 
     /**
      * This method tries to move the given player one step backward.
-     * 
+     *
      * @param player
      * @return --- true if successful, or false if the player cannot move backward for
      *         some reason, e.g. blocked by obstacle.
      */
     public boolean playerMoveBackward(Player player) {
-        Area currentArea = player.getPosition().getArea();
-        Position backPos = currentArea.getBackPos(player);
+        Position currentPosition = player.getPosition();
+        Direction currentDirection = player.getDirection();
+        Area currentArea = areas.get(currentPosition.areaId);
+        MapElement backMapElement = currentArea.getBackMapElement(player);
 
-        // check if the back position is a valid one to move to
-        if (!canMoveTo(player, backPos)) {
+        // check if there is obstacles in front
+        if (backMapElement == null || backMapElement instanceof Obstacle) {
             return false;
         }
 
-        // After canMove() check, it's safe to cast
-        GroundSquare gs = (GroundSquare) backPos;
+        Position backPosition = currentPosition.backPosition(currentDirection);
+
+        // check if it's out of board
+        if (!currentArea.isInBoard(backPosition)) {
+            return false;
+        }
+
+        // check if there are other players in front
+        if (isOccupiedByOtherPlayer(backPosition)) {
+            return false;
+        }
 
         // OK we can move him forward
-        player.setPosition(gs);
+        player.setPosition(backPosition);
         return true;
     }
 
     /**
      * This method tries to move the given player one step to the left.
-     * 
+     *
      * @param player
      * @return --- true if successful, or false if the player cannot move left for some
      *         reason, e.g. blocked by obstacle.
      */
     public boolean playerMoveLeft(Player player) {
-        Area currentArea = player.getPosition().getArea();
-        Position leftPos = currentArea.getLeftPos(player);
+        Position currentPosition = player.getPosition();
+        Direction currentDirection = player.getDirection();
+        Area currentArea = areas.get(currentPosition.areaId);
+        MapElement leftMapElement = currentArea.getLeftMapElement(player);
 
-        // check if the left position is a valid one to move to
-        if (!canMoveTo(player, leftPos)) {
+        // check if there is obstacles in front
+        if (leftMapElement == null || leftMapElement instanceof Obstacle) {
             return false;
         }
 
-        // After canMove() check, it's safe to cast
-        GroundSquare gs = (GroundSquare) leftPos;
+        Position leftPosition = currentPosition.leftPosition(currentDirection);
+
+        // check if it's out of board
+        if (!currentArea.isInBoard(leftPosition)) {
+            return false;
+        }
+
+        // check if there are other players in front
+        if (isOccupiedByOtherPlayer(leftPosition)) {
+            return false;
+        }
 
         // OK we can move him forward
-        player.setPosition(gs);
+        player.setPosition(leftPosition);
         return true;
     }
 
     /**
      * This method tries to move the given player one step to the right.
-     * 
+     *
      * @param player
      * @return --- true if successful, or false if the player cannot move right for some
      *         reason, e.g. blocked by obstacle.
      */
     public boolean playerMoveRight(Player player) {
-        Area currentArea = player.getPosition().getArea();
-        Position rightPos = currentArea.getRightPos(player);
+        Position currentPosition = player.getPosition();
+        Direction currentDirection = player.getDirection();
+        Area currentArea = areas.get(currentPosition.areaId);
+        MapElement rightMapElement = currentArea.getRightMapElement(player);
 
-        // check if the right position is a valid one to move to
-        if (!canMoveTo(player, rightPos)) {
+        // check if there is obstacles in front
+        if (rightMapElement == null || rightMapElement instanceof Obstacle) {
             return false;
         }
 
-        // After canMove() check, it's safe to cast
-        GroundSquare gs = (GroundSquare) rightPos;
+        Position rightPosition = currentPosition.rightPosition(currentDirection);
+
+        // check if it's out of board
+        if (!currentArea.isInBoard(rightPosition)) {
+            return false;
+        }
+
+        // check if there are other players in front
+        if (isOccupiedByOtherPlayer(rightPosition)) {
+            return false;
+        }
 
         // OK we can move him forward
-        player.setPosition(gs);
-        return true;
-    }
-
-    /**
-     * Whether the given position is empty, i.e. a player can move into. Note that this
-     * method is meant to check only one step away.
-     * 
-     * @param player
-     * @param position
-     * @return
-     */
-    private boolean canMoveTo(Player player, Position position) {
-        // we cannot let him move out of board or move into obstacles
-        if (position == null || !(position instanceof GroundSquare)) {
-            return false;
-        }
-
-        // we cannot let him move into other players
-        for (Player p : players.values()) {
-            if (!p.equals(player) && p.getPosition().equals(player.getPosition())) {
-                return false;
-            }
-        }
-
+        player.setPosition(rightPosition);
         return true;
     }
 
     /**
      * This method let the given player turn left.
-     * 
+     *
      * @param player
      */
     public void playerTurnLeft(Player player) {
@@ -360,7 +431,7 @@ public class Game {
 
     /**
      * This method let the given player turn right.
-     * 
+     *
      * @param player
      */
     public void playerTurnRight(Player player) {
@@ -368,130 +439,166 @@ public class Game {
     }
 
     /**
-     * This method let the given player try to unlock a chest in front.
+     * This method let the given player try to unlock a chest, room, or other lockable
+     * object in front.
      * 
      * @param player
-     * @return --- true if the chest is unlocked, or false if this action failed. Failure
-     *         can be caused by many reasons, for example it's not a chest in front, or
-     *         the player doesn't have a right key to open it.
+     * @return --- true if the loackable is unlocked, or false if this action failed.
+     *         Failure can be caused by many reasons, for example it's not a lockable in
+     *         front, or the player doesn't have a right key to open it.
      */
-    public boolean playerUnlockChest(Player player) {
-        Area currentArea = player.getPosition().getArea();
-        Position forwardPos = currentArea.getFrontPos(player);
+    public boolean playerUnlockLockable(Player player) {
+        Position currentPosition = player.getPosition();
+        Area currentArea = areas.get(currentPosition.areaId);
+        MapElement currentMapElement = currentArea.getMapElementAt(currentPosition.x,
+                currentPosition.y);
+        MapElement frontMapElement = currentArea.getFrontMapElement(player);
+        Lockable lockable = null;
 
-        // if it's not a chest
-        if (!(forwardPos instanceof Chest)) {
-            return false;
+        if (currentMapElement instanceof TransitionSpace) {
+            // is the player standing on a TransitionSpace?
+            TransitionSpace currentTransition = (TransitionSpace) currentMapElement;
+            Area destArea = areas.get(currentTransition.getDestination().areaId);
+
+            // is the player facing the room?
+            if (player.getDirection() == currentTransition.getDirection()
+                    && destArea instanceof Room) {
+                lockable = (Room) destArea;
+            }
         }
 
-        return player.tryUnlockChest((Chest) forwardPos);
+        if (frontMapElement != null && frontMapElement instanceof Lockable) {
+            // is the player facing a lockable container?
+            lockable = (Lockable) frontMapElement;
+        }
+
+        // ok let's try to unlock it.
+        if (lockable != null) {
+            return player.tryUnlock(lockable);
+        } else {
+            return false;
+        }
     }
 
+    // /**
+    // * This method let the given player try to unlock a chest in front.
+    // *
+    // * @param player
+    // * @return --- true if the chest is unlocked, or false if this action failed.
+    // Failure
+    // * can be caused by many reasons, for example it's not a chest in front, or
+    // * the player doesn't have a right key to open it.
+    // */
+    // public boolean playerUnlockChest(Player player) {
+    // Position currentPosition = player.getPosition();
+    // Area currentArea = areas.get(currentPosition.areaId);
+    // MapElement frontMapElement = currentArea.getFrontMapElement(player);
+    //
+    // // no it's not a chest
+    // if (!(frontMapElement instanceof Chest)) {
+    // return false;
+    // }
+    //
+    // return player.tryUnlock((Chest) frontMapElement);
+    // }
+    //
+    // /**
+    // * This method let the given player try to unlock a room in front.
+    // *
+    // * @param player
+    // * @return --- true if the room is unlocked, or false if this action failed. Failure
+    // * can be caused by many reasons, for example it's not a room in front, or the
+    // * player doesn't have a right key to open it.
+    // */
+    // public boolean playerUnlockRoom(Player player) {
+    // Position currentPosition = player.getPosition();
+    // Area currentArea = areas.get(currentPosition.areaId);
+    // MapElement currentMapElement = currentArea.getMapElementAt(currentPosition.x,
+    // currentPosition.y);
+    //
+    // // no it's not a TransitionSpace
+    // if (!(currentMapElement instanceof TransitionSpace)) {
+    // return false;
+    // }
+    //
+    // TransitionSpace currentTransition = (TransitionSpace) currentMapElement;
+    // Area destArea = areas.get(currentTransition.getDestination().areaId);
+    //
+    // // no it's not a room in the other end.
+    // if (!(destArea instanceof Room)) {
+    // return false;
+    // }
+    //
+    // // no the player is not facing the room
+    // if (player.getDirection() != currentTransition.getDirection()) {
+    // return false;
+    // }
+    //
+    // return player.tryUnlock((Room) destArea);
+    // }
+
     /**
-     * This method let the player try to take items from the chest in front. If the
-     * player's inventory can contain all items, he will take them all; otherwise he will
+     * This method let the player try to take items from the container in front. If the
+     * player's inventory can take in all items, he will take them all; otherwise he will
      * take as many as he can until his inventory is full.
-     * 
+     *
      * @param player
-     * @return --- true if he has taken at least one item from the chest, or false if he
-     *         has taken none from the chest.
+     * @return --- true if he has taken at least one item from the container, or false if
+     *         he has taken none from the container.
      */
-    public boolean playerTakeItemsInChest(Player player) {
-        Area currentArea = player.getPosition().getArea();
-        Position forwardPos = currentArea.getFrontPos(player);
+    public boolean playerTakeItemsFromContainer(Player player) {
+        Position currentPosition = player.getPosition();
+        Area currentArea = areas.get(currentPosition.areaId);
+        MapElement frontMapElement = currentArea.getFrontMapElement(player);
 
-        // if it's not a chest
-        if (!(forwardPos instanceof Chest)) {
+        // no it's not a container
+        if (!(frontMapElement instanceof Container)) {
             return false;
         }
 
-        return player.tryTakeItemsInChest((Chest) forwardPos);
+        return player.tryTakeItemsFromContainer((Container) frontMapElement);
     }
 
     /**
-     * This method let the given player try to unlock a room in front.
-     * 
-     * @param player
-     * @return --- true if the room is unlocked, or false if this action failed. Failure
-     *         can be caused by many reasons, for example it's not a room in front, or the
-     *         player doesn't have a right key to open it.
-     */
-    public boolean playerUnlockRoom(Player player) {
-        GroundSquare currentPos = player.getPosition();
-
-        // if the player is not standing on an entrance tile
-        if (!(currentPos instanceof RoomEntrance)) {
-            return false;
-        }
-
-        RoomEntrance entrance = (RoomEntrance) currentPos;
-
-        // if the player is not facing the room door
-        if (player.getDirection() != entrance.getFacingDirection()) {
-            return false;
-        }
-
-        Room room = entrance.getRoom();
-        return player.tryUnlockDoor(room);
-    }
-
-    /**
-     * This method let the given player try to enter or exit a room depending on the
-     * player's current position.
+     * This method let the given player try to transit between areas (enter or exit a
+     * room).
      * 
      * @param player
      * @return --- true if the player changed to another area, or false if this action
      *         failed for some reason, for example the player is not facing the door, or
      *         he is too far from it.
      */
-    public boolean playerEnterExitRoom(Player player) {
-        GroundSquare currentPos = player.getPosition();
+    public boolean playerTransit(Player player) {
+        Position currentPosition = player.getPosition();
+        Area currentArea = areas.get(currentPosition.areaId);
+        MapElement currentMapElement = currentArea.getMapElementAt(currentPosition.x,
+                currentPosition.y);
 
-        if (currentPos instanceof RoomEntrance) {
-            // the player is standing in front of a room ready to enter
-            RoomEntrance entrance = (RoomEntrance) currentPos;
-            // if the player is not facing the room door
-            if (player.getDirection() != entrance.getFacingDirection()) {
-                return false;
-            }
-            Room room = entrance.getRoom();
-            return player.tryEnterRoom(room);
-
-        } else if (currentPos instanceof RoomExit) {
-            // the player is standing inside a room and ready to exit
-            RoomExit exit = (RoomExit) currentPos;
-            Room room = (Room) exit.getArea();
-            return player.tryExitRoom(room, entrances.get(room));
-
+        // no it's not a TransitionSpace
+        if (!(currentMapElement instanceof TransitionSpace)) {
+            return false;
         }
 
-        // not within a valid distance to door
-        return false;
-    }
+        TransitionSpace currentTransition = (TransitionSpace) currentMapElement;
+        Area destArea = areas.get(currentTransition.getDestination().areaId);
+        // no it's a room in the other end and it's locked
+        if (destArea instanceof Room && ((Room) destArea).isLocked()) {
+            return false;
+        }
 
-    /**
-     * Get the player's health left in seconds.
-     * 
-     * @param player
-     * @return
-     */
-    public int getPlayerHealth(Player player) {
-        return player.getHealthLeft();
-    }
+        // no the player is not facing the right direction
+        if (player.getDirection() != currentTransition.getDirection()) {
+            return false;
+        }
 
-    /**
-     * Get all items in the player's inventory as a list.
-     * 
-     * @param player
-     * @return
-     */
-    public List<Item> getPlayerInventory(Player player) {
-        return player.getInventory();
+        // OK, space travel time
+        player.setPosition(currentTransition.getDestination());
+        return true;
     }
 
     /**
      * This method let the player use an item.
-     * 
+     *
      * @param player
      * @param item
      */
@@ -508,9 +615,9 @@ public class Game {
             // Key
 
             /*
-             * XXX I don't want the key to be directly used. A key should be in player's
-             * inventory waiting to be automatically consumed when the player unlocks a
-             * chest or room.
+             * XXX We can but I don't really want the key to be directly used. A key
+             * should be in player's inventory waiting to be automatically consumed when
+             * the player unlocks a chest or room.
              */
 
         }
@@ -520,7 +627,7 @@ public class Game {
 
     /**
      * This method let the player try to destroy an item.
-     * 
+     *
      * @param player
      * @param item
      * @return --- true if the item is destroyed, or false if the action failed.
@@ -533,12 +640,135 @@ public class Game {
     }
 
     /**
-     * This method is used to automatically update the game status.
+     * Gets the specified player's visibility according to current time.
      * 
+     * @param player
+     * @return
      */
-    public synchronized void update() {
-        // TODO Auto-generated method stub
+    public int getPlayerVisibility(Player player) {
 
+        if (clock.getHour() >= 6 && clock.getHour() < 18) {
+            // it's day time
+            return DAY_VISIBLIITY;
+        } else {
+            // it's night time
+            if (player.isHoldingTorch()) {
+                return TORCH_VISIBILITY;
+            } else {
+                return NIGHT_VISIBILITY;
+            }
+        }
+    }
+
+    public Area getWorld() {
+        return world;
+    }
+
+    public Map<Integer, Area> getAreas() {
+        return areas;
+    }
+
+    /**
+     * This method returns the clock of the world. The world time is constantly advancing.
+     *
+     * @return
+     */
+    public LocalTime getClock() {
+        return clock;
+    }
+
+    public Player getPlayer() {
+        return player;
+    }
+
+    public Player getPlayerById(int id) {
+        Player player = players.get(id);
+        if (player == null) {
+            throw new GameError("Unknown player Id.");
+        }
+
+        return player;
+    }
+
+    /**
+     * Get the player's health left in seconds.
+     *
+     * @param player
+     * @return
+     */
+    public int getPlayerHealth(Player player) {
+        return player.getHealthLeft();
+    }
+
+    /**
+     * Get all items in the player's inventory as a list.
+     *
+     * @param player
+     * @return
+     */
+    public List<Item> getPlayerInventory(Player player) {
+        return player.getInventory();
+    }
+
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((areas == null) ? 0 : areas.hashCode());
+        result = prime * result + ((clock == null) ? 0 : clock.hashCode());
+        result = prime * result + ((player == null) ? 0 : player.hashCode());
+        result = prime * result + ((players == null) ? 0 : players.hashCode());
+        result = prime * result + ((timer == null) ? 0 : timer.hashCode());
+        result = prime * result + ((torches == null) ? 0 : torches.hashCode());
+        result = prime * result + ((world == null) ? 0 : world.hashCode());
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        Game other = (Game) obj;
+        if (areas == null) {
+            if (other.areas != null)
+                return false;
+        } else if (!areas.equals(other.areas))
+            return false;
+        if (clock == null) {
+            if (other.clock != null)
+                return false;
+        } else if (!clock.equals(other.clock))
+            return false;
+        if (player == null) {
+            if (other.player != null)
+                return false;
+        } else if (!player.equals(other.player))
+            return false;
+        if (players == null) {
+            if (other.players != null)
+                return false;
+        } else if (!players.equals(other.players))
+            return false;
+        if (timer == null) {
+            if (other.timer != null)
+                return false;
+        } else if (!timer.equals(other.timer))
+            return false;
+        if (torches == null) {
+            if (other.torches != null)
+                return false;
+        } else if (!torches.equals(other.torches))
+            return false;
+        if (world == null) {
+            if (other.world != null)
+                return false;
+        } else if (!world.equals(other.world))
+            return false;
+        return true;
     }
 
 }

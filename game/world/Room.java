@@ -2,28 +2,25 @@ package game.world;
 
 /**
  * This class represents a room.
- * 
- * 
+ *
  * @author Hector (Fang Zhao 300364061)
  *
  */
-public class Room extends Area {
-
+public class Room extends Area implements Lockable {
     /**
      * The keyID specifies which key can open the door to this room. Only the key with the
      * same keyID can open the door to this room.
      */
     private int keyID;
-
+    /**
+     * Is this room locked? If so the player needs a right key to open this room.
+     */
     private boolean isLocked;
-
-    private RoomExit exit;
 
     /**
      * Constructor
-     * 
+     *
      * @param filename
-     * @param roomID
      * @param keyID
      * @param isLocked
      */
@@ -31,55 +28,60 @@ public class Room extends Area {
         super(filename);
         this.keyID = keyID;
         this.isLocked = isLocked;
-
-        // remember the exit
-        rememberEixt();
     }
 
     /**
      * Constructor used in test. Probably will be discarded.
      * 
-     * @param width
-     * @param height
      * @param board
+     * @param areaID
+     * @param keyID
+     * @param isLocked
      */
-    public Room(Position[][] board, int keyID, boolean isLocked) {
-        super(board);
+    public Room(MapElement[][] board, int areaID, int keyID, boolean isLocked) {
+        super(board, areaID);
         this.keyID = keyID;
         this.isLocked = isLocked;
-
-        // remember the exit
-        rememberEixt();
     }
 
-    /**
-     * let the room remember where the exit is.
-     */
-    public void rememberEixt() {
-        for (Position[] row : board) {
-            for (Position col : row) {
-                if (col instanceof RoomExit) {
-                    this.exit = (RoomExit) col;
-                    return;
-                }
-            }
-        }
-    }
-
+    @Override
     public int getKeyID() {
         return keyID;
     }
 
+    @Override
     public boolean isLocked() {
         return isLocked;
     }
 
+    @Override
     public void setLocked(boolean boo) {
         isLocked = boo;
     }
 
-    public RoomExit getExit() {
-        return exit;
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + (isLocked ? 1231 : 1237);
+        result = prime * result + keyID;
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        Room other = (Room) obj;
+        if (isLocked != other.isLocked)
+            return false;
+        if (keyID != other.keyID)
+            return false;
+        return true;
     }
 
 }

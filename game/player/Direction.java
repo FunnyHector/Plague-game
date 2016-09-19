@@ -69,13 +69,13 @@ public enum Direction {
     public char getChar() {
         switch (this) {
         case East:
-            return '→';
+            return '>';
         case North:
-            return '↑';
+            return '^';
         case South:
-            return '↓';
+            return 'v';
         case West:
-            return '←';
+            return '<';
         default:
             return ' '; // dead code
         }

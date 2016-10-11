@@ -16,7 +16,7 @@ import server.game.world.Lockable;
  * This class represents a player. When the player is loaded from a data file,
  * the Builder pattern is used in the construction.
  *
- * @author Hector (Fang Zhao 300364061), Daniel Anastasi 300145878
+ * @author Hector (Fang Zhao 300364061)
  *
  */
 public class Player {
@@ -192,7 +192,8 @@ public class Player {
 		if (antidote.getVirus().equals(virus)) {
 			increaseHealth(Antidote.EFFECT);
 		} else {
-			int effect = Math.random() < Antidote.CURE_CHANCE ? Antidote.EFFECT * 3 : -Antidote.EFFECT;
+			int effect = Math.random() < Antidote.CURE_CHANCE ? Antidote.EFFECT * Antidote.MULTIPLIER
+					: -Antidote.EFFECT;
 			increaseHealth(effect);
 		}
 

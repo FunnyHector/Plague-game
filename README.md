@@ -8,37 +8,41 @@ I personally wrote 100% of game logic and client/server, and 80% of the integrat
 There are still bugs and lots of imperfections scattered all over the game, but it's due very soon. We'll do our best to perfect it.
 
 
-=================================================================================  
-PLAGUE
-THE POINT OF THE GAME
+
+# PLAGUE  
+  
+
+# THE POINT OF THE GAME
 The winner of the game is the last player left alive.
 In Plague each player starts out in randomised position in the main game area.
 Each player is dying from a different virus, which causes their health to decline with time.
 They must search for antidotes to temporarily raise their health again, to keep them alive for longer.
-===========================================================================================================
-STARTING THE GAME
+  
+  
+# STARTING THE GAME
 1. Starting the server:
-On the computer which will host the server, run the file Plague.jar file with the following command line command:
-java -jar Plague.jar -server
-A dialog will open requesting the number of players for the upcoming game.
-Enter a number between 2 and 4 (inclusive).
+  On the computer which will host the server, run the file Plague.jar file with the following command line command:
+  java -jar Plague.jar -server
+  A dialog will open requesting the number of players for the upcoming game.
+  Enter a number between 2 and 4 (inclusive).
 2. Starting a client
-Open Plague.jar using the command line command:
+  Open Plague.jar using the command line command:
   java -jar Plague.jar -client
-Press "Play".
+  Press "Play".
 3. Connecting the client to the server:
-In the window which appears fill out the "Enter UserName" field with your name.
-In the "Enter IP Address" field, enter the IP address of the computer hosting the server.
+  In the window which appears fill out the "Enter UserName" field with your name.
+  In the "Enter IP Address" field, enter the IP address of the computer hosting the server.
   This number can be found in the window that opens after the server starts, uner "Server Address".
-  The number is 9 numbers long, with periods between them, in the order XXX.XXX.X.XXX
-In the "Port Number " field, enter the port number from the server window also.
-  This number is 4 digits long.
-Press "Login"
+  The number is 9 numbers long, with periods between them, in the order XXX.XXX.XXX.XXX
+  In the "Port Number " field, enter the port number from the server window also.
+  This number is 6000 by default.
+  Press "Login"
 4. A small window will open, giving the choice of "Ready" or "Leave".
   When you are ready to play, press ready.
   The game will start once the number of players specified in the server start-up are ready.
-===========================================================================================================
-CONTROLS
+  
+  
+# CONTROLS
 Action:		Key:
 Move up		w
 Move down	a
@@ -59,11 +63,14 @@ Use item in slot 7	7
 Use item in slot 8	8
 *Gets all loot from a container. If the player does not have room in their inventory to carry all of the loot, then the
 remaining loot is left in the container. Containers can be chests, scrap piles, or cupboards.
-============================================================================================================
-HOW TO PLAY
+  
+  
+# HOW TO PLAY
 Each player must run around looking for antidotes to keep them alive.
 Loot (items which you can find) can include Antidotes, Keys, Bags, and Torches. They are always found inside Chests, Scrap Piles,
-and Cupboards.
+and Cupboards.  
+  
+
 Antidote:
   Antidotes each help heal a particular virus. If a player uses an antidote which matches their virus, the antidote will restore
   a portion of their health. Players can also use antidotes which cure other viruses. This has a high chance to hurt the player,
